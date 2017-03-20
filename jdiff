@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+
+import json
+import sys
+import os
+import argparse
+import subprocess
+import traceback
+import shutil
+
+def fmt_json_tmpfile(name):
+    tmpfile = "{}.tmp{}".format(name, os.getpid())
+    enum = 0
+    while os.path.exists(tmpfile):
+        tmpfile = "{}.tmp{}-{}".format(name, os.getpid(), enum)
+        enum += 1
+
+    with open(name) as infile:
+        with open(tmpfile, "w") as outfile:
+            json.dump(json.load(infile), outfile, indent=2, sort_keys=True)
+            outfile.write("\n")
+
+    return tmpfile
+
+parser = argparse.ArgumentParser()
+parser.add_argument("file1")
+parser.add_argument("file2")
+args = parser.parse_args()
+
+diff = shutil.which("colordiff")
+if not diff:
+    diff = shutil.which("diff")
+if not diff:
+    os.exit("Cannot find 'diff' utility")
+
+tmpfile1 = ''
+tmpfile2 = ''
+try:
+    tmpfile1 = fmt_json_tmpfile(args.file1)
+    tmpfile2 = fmt_json_tmpfile(args.file2)
+    proc = subprocess.Popen([diff, "-u", tmpfile1, tmpfile2])
+    proc.wait()
+except:
+    traceback.print_exc()
+finally:
+    for fname in [tmpfile1, tmpfile2]:
+        if fname and os.path.exists(fname):
+            os.unlink(fname)
